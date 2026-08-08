@@ -1,0 +1,18 @@
+[project]
+name = "smartvideo-player"
+version = "1.0.1"
+description = "Cue player for stage productions - Windows edition"
+requires-python = ">=3.9"
+dependencies = [
+    "PySide6>=6.5.0",
+]
+
+[project.scripts]
+smartplayer = "smartplayer.main:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
