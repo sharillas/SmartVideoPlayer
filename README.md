@@ -2,7 +2,7 @@
 
 **Cue player for stage productions — Windows edition**
 
-SmartVideoPlayer is a professional cue-based media player designed for theater, musicals, live events, and stage productions. Built from scratch for Windows, inspired by [Linux Show Player](https://github.com/FrancescoCeruti/linux-show-player).
+SmartVideoPlayer is a professional cue-based media player designed for theater, musicals, live events, and stage productions. Built from scratch for Windows.
 
 ---
 
@@ -10,10 +10,9 @@ SmartVideoPlayer is a professional cue-based media player designed for theater, 
 
 ### Core
 - **Cue-based playback** — trigger media cues with precise timing
-- **Pre-Wait / Post-Wait** — configurable delays before and after each cue
 - **5 Next Actions** — Next Cue, Previous Cue, Stop at end & out, Pause and keep Last Frame, Loop
 - **Fade In / Fade Out** — 5 fade curves: Linear, Quadratic, Exponential, Logarithmic, SCurve
-- **Undo/Redo** — Ctrl+Z / Ctrl+Y for all cue operations
+
 
 ### Media Support
 - **Audio**: WAV, MP3, OGG, FLAC, AAC, M4A, WMA
