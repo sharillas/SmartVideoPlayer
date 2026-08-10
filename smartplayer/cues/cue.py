@@ -61,6 +61,7 @@ class Cue(HasProperties):
     fadeout_duration = Property(default=500)
     priority = Property(default=3)
     color = Property(default="")
+    output_target = Property(default=0)
 
     def __init__(self, cue_id: str | None = None, **kwargs):
         super().__init__(**kwargs)

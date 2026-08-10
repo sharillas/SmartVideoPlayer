@@ -21,25 +21,25 @@ RESOLUTION_PRESETS = {
 
 class VideoOutputManager:
     def __init__(self):
-        self._window: VideoOutputWindow | None = None
-        self._pattern_player = None
-        self._pattern_audio = None
-        self._last_pattern = None
+        self._windows: dict[int, VideoOutputWindow] = {}
+        self._pattern_player: QMediaPlayer | None = None
+        self._pattern_audio: QAudioOutput | None = None
+        self._last_pattern: str | None = None
         self._screen_count = len(QGuiApplication.screens())
+        self._output_screen_index = 1 if self._screen_count > 1 else 0
+        self._output_mode = "fullscreen"
+        self._custom_width = 1920
+        self._custom_height = 1080
+        self._custom_x = 0
+        self._custom_y = 0
 
-        # Default test pattern (bundled in resources)
+        # Default test pattern (bundled)
         bundled_pattern = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
             "resources", "grid_pattern.png"
         )
         if os.path.exists(bundled_pattern):
             self._last_pattern = bundled_pattern
-        self._output_screen_index = 1 if self._screen_count > 1 else 0
-        self._output_mode = "fullscreen"  # fullscreen | windowed | custom
-        self._custom_width = 1920
-        self._custom_height = 1080
-        self._custom_x = 0
-        self._custom_y = 0
 
     @property
     def screen_count(self) -> int:
@@ -55,8 +55,7 @@ class VideoOutputManager:
 
     @output_screen_index.setter
     def output_screen_index(self, value: int):
-        screens = QGuiApplication.screens()
-        if 0 <= value < len(screens):
+        if 0 <= value < len(QGuiApplication.screens()):
             self._output_screen_index = value
 
     @property
@@ -83,29 +82,67 @@ class VideoOutputManager:
     def custom_position(self, value: tuple[int, int]):
         self._custom_x, self._custom_y = value
 
-    def active_widget(self) -> QVideoWidget:
-        self._ensure_window()
-        return self._window.video_widget
+    def _get_window(self, screen_index: int) -> VideoOutputWindow:
+        if screen_index not in self._windows:
+            win = VideoOutputWindow()
+            win.set_target_screen(screen_index)
+            self._windows[screen_index] = win
+        return self._windows[screen_index]
 
-    def show_video(self):
-        self._ensure_window()
+    def video_widget_for(self, screen_index: int) -> QVideoWidget:
+        win = self._get_window(screen_index)
+        self._show_window(win, screen_index)
+        return win.video_widget
+
+    def _show_window(self, win: VideoOutputWindow, screen_index: int):
         if self.has_external_display:
             if self._output_mode == "custom":
-                self._window.go_custom_windowed(
-                    self._output_screen_index,
+                win.go_custom_windowed(
+                    screen_index,
                     self._custom_width, self._custom_height,
                     self._custom_x, self._custom_y
                 )
             else:
-                self._window.go_fullscreen_on_screen(self._output_screen_index)
+                win.go_fullscreen_on_screen(screen_index)
         else:
-            w, h = self._custom_width, self._custom_height
-            self._window.show_as_window(w, h)
+            win.show_as_window(self._custom_width, self._custom_height)
 
-    def hide_video(self):
-        if not self.has_external_display:
-            if self._window is not None:
-                self._window.hide()
+    def show_black_screen(self):
+        for screen_index in range(self._screen_count):
+            if screen_index > 0 or not self.has_external_display:
+                self._get_window(screen_index)
+                self._show_window(self._windows[screen_index], screen_index)
+
+    def force_hide(self):
+        for win in self._windows.values():
+            win.exit_fullscreen()
+            win.hide()
+
+    def close_all(self):
+        if self._pattern_player:
+            self._pattern_player.stop()
+        for win in self._windows.values():
+            win.exit_fullscreen()
+            win.hide()
+            win.close()
+        self._windows.clear()
+
+    def show_test_pattern(self, filepath: str):
+        self._last_pattern = filepath
+        target = self._output_screen_index
+        win = self._get_window(target)
+        self._show_window(win, target)
+
+        if self._pattern_player is None:
+            self._pattern_player = QMediaPlayer()
+            self._pattern_audio = QAudioOutput()
+            self._pattern_player.setAudioOutput(self._pattern_audio)
+            self._pattern_audio.setVolume(0)
+
+        self._pattern_player.setVideoOutput(win.video_widget)
+        self._pattern_player.setSource(QUrl.fromLocalFile(filepath))
+        self._pattern_player.setLoops(QMediaPlayer.Loops.Infinite)
+        self._pattern_player.play()
 
     def stop_pattern(self):
         if self._pattern_player is not None:
@@ -122,62 +159,6 @@ class VideoOutputManager:
     def show_last_pattern(self):
         if self._last_pattern:
             self.show_test_pattern(self._last_pattern)
-
-    def force_hide(self):
-        if self._window is not None:
-            self._window.exit_fullscreen()
-            self._window.hide()
-
-    def close_all(self):
-        if self._window is not None:
-            self._window.exit_fullscreen()
-            self._window.hide()
-            self._window.close()
-
-    def show_black_screen(self):
-        self._ensure_window()
-        if self._pattern_player:
-            self._pattern_player.stop()
-        if self.has_external_display:
-            if self._output_mode == "custom":
-                self._window.go_custom_windowed(
-                    self._output_screen_index,
-                    self._custom_width, self._custom_height,
-                    self._custom_x, self._custom_y
-                )
-            else:
-                self._window.go_fullscreen_on_screen(self._output_screen_index)
-
-    def show_test_pattern(self, filepath: str):
-        self._last_pattern = filepath
-        self._ensure_window()
-        if self.has_external_display:
-            if self._output_mode == "custom":
-                self._window.go_custom_windowed(
-                    self._output_screen_index,
-                    self._custom_width, self._custom_height,
-                    self._custom_x, self._custom_y
-                )
-            else:
-                self._window.go_fullscreen_on_screen(self._output_screen_index)
-        else:
-            self._window.show_as_window(self._custom_width, self._custom_height)
-
-        if self._pattern_player is None:
-            self._pattern_player = QMediaPlayer()
-            self._pattern_audio = QAudioOutput()
-            self._pattern_player.setAudioOutput(self._pattern_audio)
-            self._pattern_audio.setVolume(0)
-
-        self._pattern_player.setVideoOutput(self._window.video_widget)
-        self._pattern_player.setSource(QUrl.fromLocalFile(filepath))
-        self._pattern_player.setLoops(QMediaPlayer.Loops.Infinite)
-        self._pattern_player.play()
-
-    def _ensure_window(self):
-        if self._window is None:
-            self._window = VideoOutputWindow()
-            self._window.set_target_screen(self._output_screen_index)
 
     def available_screens(self) -> list[dict]:
         screens = QGuiApplication.screens()
@@ -196,11 +177,8 @@ class VideoOutputManager:
 
     def status_text(self) -> str:
         if self.has_external_display:
-            if self._output_mode == "custom":
-                return f"Video: {self._custom_width}x{self._custom_height} on Display {self._output_screen_index}"
             return f"Video: Ext. Display {self._output_screen_index} (fullscreen)"
-        else:
-            return f"Video: Window {self._custom_width}x{self._custom_height}"
+        return f"Video: Window {self._custom_width}x{self._custom_height}"
 
     @staticmethod
     def resolution_presets() -> dict:

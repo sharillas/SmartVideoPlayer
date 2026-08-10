@@ -124,11 +124,13 @@ class CueListView(QWidget):
         self._table.verticalHeader().setVisible(False)
         self._table.horizontalHeader().setStretchLastSection(True)
         self._table.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignLeft)
-        self._table.setColumnWidth(CueTableModel.COL_INDEX, 36)
-        self._table.setColumnWidth(CueTableModel.COL_NAME, 220)
+        self._table.setColumnWidth(CueTableModel.COL_INDEX, 32)
+        self._table.setColumnWidth(CueTableModel.COL_NAME, 180)
         self._table.setColumnWidth(CueTableModel.COL_REMAINING, 80)
         self._table.setColumnWidth(CueTableModel.COL_DURATION, 75)
-        self._table.setColumnWidth(CueTableModel.COL_NEXT, 42)
+        self._table.setColumnWidth(CueTableModel.COL_NEXT, 36)
+        self._table.setColumnWidth(CueTableModel.COL_OUTPUT, 36)
+        self._table.setColumnWidth(CueTableModel.COL_ACTIONS, 30)
         self._table.clicked.connect(self._on_cue_clicked)
         self._table.setStyleSheet(
             "QTableView { border: 1px solid #3a3a3a; }"
@@ -256,10 +258,8 @@ class CueListView(QWidget):
         cue = self._cue_model.cue_at(self._standby_index)
         if cue is None:
             return
-
         self._pending_go = True
 
-        # Priority check: stop running cues with lower priority
         if self._current_cue and self._current_cue.state & CueState.IsRunning:
             if self._current_cue.priority <= cue.priority:
                 self._current_cue.execute(CueAction.Stop)
@@ -267,22 +267,7 @@ class CueListView(QWidget):
                 self._pending_go = False
                 return
 
-        if isinstance(cue, MediaCue) and self._is_video_file(cue.media.uri):
-            if self._display_enabled:
-                video_widget = self._video_manager.active_widget()
-                cue.set_video_output(video_widget)
-                self._video_manager.show_video()
-            else:
-                cue.set_video_output(None)
-
-        cue.execute(CueAction.Start)
-        cue.end.connect(self._on_cue_ended)
-        cue.changed.connect(self._on_cue_changed)
-        self._current_cue = cue
-        self._current_row = self._standby_index
-
-        self._progress_timer.start()
-        self._table_model.refresh_row(self._current_row)
+        self._play_cue(cue, self._standby_index)
         self._pending_go = False
 
     def _on_cue_ended(self):
@@ -460,10 +445,46 @@ class CueListView(QWidget):
 
     def _on_cue_clicked(self, index):
         row = index.row()
+        col = index.column()
+        cue = self._cue_model.cue_at(row)
+        if cue is None:
+            return
+
+        # Actions column: Play/Stop toggle
+        if col == CueTableModel.COL_ACTIONS:
+            if cue.state & CueState.Running:
+                cue.execute(CueAction.Stop)
+                self._table_model.refresh_row(row)
+            elif cue.state & CueState.Pause:
+                cue.execute(CueAction.Resume)
+                self._table_model.refresh_row(row)
+            else:
+                self._play_cue(cue, row)
+            return
+
+        # Output column: cycle target
+        if col == CueTableModel.COL_OUTPUT:
+            max_screens = self._video_manager.screen_count
+            cue.output_target = (cue.output_target + 1) % max(1, max_screens)
+            self._table_model.refresh_row(row)
+            return
+
+        # Default: select and edit
         self._standby_index = row
         self._table.selectRow(row)
-        cue = self._cue_model.cue_at(row)
         self._editor_panel.set_cue(cue)
+
+    def _play_cue(self, cue, row: int):
+        if isinstance(cue, MediaCue) and self._is_video_file(cue.media.uri):
+            if self._display_enabled:
+                widget = self._video_manager.video_widget_for(cue.output_target)
+                cue.set_video_output(widget)
+            else:
+                cue.set_video_output(None)
+        cue.execute(CueAction.Start)
+        self._current_cue = cue
+        self._current_row = row
+        self._table_model.refresh_row(row)
 
     def _on_volume_changed(self, value):
         self._vol_label.setText(f"{value}%")

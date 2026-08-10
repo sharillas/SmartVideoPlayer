@@ -31,7 +31,7 @@ class MediaCue(Cue):
 
     def set_video_output(self, video_widget):
         self._video_output = video_widget
-        if self._player is not None:
+        if self._player is not None and video_widget is not None:
             self._player.setVideoOutput(video_widget)
 
     def _setup_player(self):
