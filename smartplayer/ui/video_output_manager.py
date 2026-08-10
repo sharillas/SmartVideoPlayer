@@ -20,6 +20,8 @@ RESOLUTION_PRESETS = {
 class VideoOutputManager:
     def __init__(self):
         self._window: VideoOutputWindow | None = None
+        self._pattern_player = None
+        self._pattern_audio = None
         self._screen_count = len(QGuiApplication.screens())
         self._output_screen_index = 1 if self._screen_count > 1 else 0
         self._output_mode = "fullscreen"  # fullscreen | windowed | custom
@@ -94,6 +96,10 @@ class VideoOutputManager:
             if self._window is not None:
                 self._window.hide()
 
+    def stop_pattern(self):
+        if self._pattern_player is not None:
+            self._pattern_player.stop()
+
     def force_hide(self):
         if self._window is not None:
             self._window.exit_fullscreen()
@@ -107,7 +113,7 @@ class VideoOutputManager:
 
     def show_black_screen(self):
         self._ensure_window()
-        if self._pattern_player:
+        if self._pattern_player is not None:
             self._pattern_player.stop()
         if self.has_external_display:
             if self._output_mode == "custom":
@@ -133,22 +139,16 @@ class VideoOutputManager:
         else:
             self._window.show_as_window(self._custom_width, self._custom_height)
 
-        # Setup a dedicated player for test patterns
         if not hasattr(self, '_pattern_player') or self._pattern_player is None:
             self._pattern_player = QMediaPlayer()
             self._pattern_audio = QAudioOutput()
             self._pattern_player.setAudioOutput(self._pattern_audio)
-            self._pattern_audio.setVolume(0)  # Mute test patterns
-            self._pattern_player.setVideoOutput(self._window.video_widget)
-            self._pattern_player.mediaStatusChanged.connect(self._on_pattern_status)
+            self._pattern_audio.setVolume(0)
 
+        self._pattern_player.setVideoOutput(self._window.video_widget)
         self._pattern_player.setSource(QUrl.fromLocalFile(filepath))
+        self._pattern_player.setLoops(QMediaPlayer.Loops.Infinite)
         self._pattern_player.play()
-
-    def _on_pattern_status(self, status):
-        if status == QMediaPlayer.MediaStatus.EndOfMedia:
-            self._pattern_player.setPosition(0)
-            self._pattern_player.play()  # Loop test pattern
 
     def _ensure_window(self):
         if self._window is None:

@@ -108,15 +108,11 @@ class DisplaySettingsDialog(QDialog):
         layout.addWidget(mode_group)
 
         # Test buttons
-        test_group = QGroupBox("Output Preview / Test Patterns")
+        test_group = QGroupBox("Test Patterns")
         test_layout = QVBoxLayout(test_group)
 
         row1 = QHBoxLayout()
-        self._test_btn = QPushButton("Black Output")
-        self._test_btn.clicked.connect(self._on_test_black)
-        row1.addWidget(self._test_btn)
-
-        self._pattern_btn = QPushButton("Load Test Pattern...")
+        self._pattern_btn = QPushButton("Load Pattern...")
         self._pattern_btn.clicked.connect(self._on_load_pattern)
         row1.addWidget(self._pattern_btn)
         test_layout.addLayout(row1)
@@ -127,14 +123,14 @@ class DisplaySettingsDialog(QDialog):
         self._pattern_label.setWordWrap(True)
         row2.addWidget(self._pattern_label, 1)
 
-        self._show_pattern_btn = QPushButton("Show Pattern")
+        self._show_pattern_btn = QPushButton("Show Test Pattern")
         self._show_pattern_btn.setEnabled(False)
         self._show_pattern_btn.clicked.connect(self._on_show_pattern)
         row2.addWidget(self._show_pattern_btn)
 
-        self._hide_btn = QPushButton("Hide Output")
-        self._hide_btn.clicked.connect(self._on_hide_test)
-        row2.addWidget(self._hide_btn)
+        self._off_pattern_btn = QPushButton("Off Pattern")
+        self._off_pattern_btn.clicked.connect(self._on_hide_test)
+        row2.addWidget(self._off_pattern_btn)
         test_layout.addLayout(row2)
 
         layout.addWidget(test_group)
@@ -170,10 +166,6 @@ class DisplaySettingsDialog(QDialog):
             self._width_spin.setValue(w)
             self._height_spin.setValue(h)
 
-    def _on_test_black(self):
-        self._apply_to_manager()
-        self._vm.show_black_screen()
-
     def _on_load_pattern(self):
         filepath, _ = QFileDialog.getOpenFileName(
             self, "Select Test Pattern",
@@ -191,11 +183,8 @@ class DisplaySettingsDialog(QDialog):
         if hasattr(self, '_pattern_path') and self._pattern_path:
             self._vm.show_test_pattern(self._pattern_path)
 
-    def _on_test(self):
-        self._apply_to_manager()
-        self._vm.show_black_screen()
-
     def _on_hide_test(self):
+        self._vm.stop_pattern()
         self._vm.force_hide()
 
     def _load_values(self):
