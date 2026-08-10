@@ -57,8 +57,10 @@ class Cue(HasProperties):
     next_action = Property(default=NextAction.StopEndOut)
     fadein_type = Property(default=FadeType.Linear)
     fadeout_type = Property(default=FadeType.Linear)
-    fadein_duration = Property(default=0)
-    fadeout_duration = Property(default=0)
+    fadein_duration = Property(default=500)
+    fadeout_duration = Property(default=500)
+    priority = Property(default=3)
+    color = Property(default="")
 
     def __init__(self, cue_id: str | None = None, **kwargs):
         super().__init__(**kwargs)

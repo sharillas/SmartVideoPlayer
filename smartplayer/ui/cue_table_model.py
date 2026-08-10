@@ -25,6 +25,11 @@ class ProgressDelegate(QStyledItemDelegate):
 
         super().paint(painter, option, index)
 
+        # Color tag: draw colored left stripe
+        if cue.color and cue.color != "":
+            c = QColor(cue.color)
+            painter.fillRect(option.rect.x(), option.rect.y(), 4, option.rect.height(), c)
+
         if is_active and col == CueTableModel.COL_REMAINING and is_running and cue.duration > 0:
             progress = min(self._model.current_position / max(cue.duration, 1), 1.0)
             if progress > 0:

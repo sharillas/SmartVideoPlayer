@@ -3,7 +3,8 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QTabWidget,
     QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox,
-    QLabel, QTextEdit, QPushButton, QHBoxLayout
+    QLabel, QTextEdit, QPushButton, QHBoxLayout,
+    QColorDialog
 )
 from PySide6.QtCore import Qt
 
@@ -69,6 +70,25 @@ class CueEditorPanel(QWidget):
         self._name_edit.setPlaceholderText("Cue name...")
         self._name_edit.textChanged.connect(self._on_name_changed)
         form.addRow("Name:", self._name_edit)
+
+        self._priority_spin = QSpinBox()
+        self._priority_spin.setRange(1, 5)
+        self._priority_spin.setValue(3)
+        self._priority_spin.setToolTip("1=Lowest, 5=Highest. Higher priority cues can interrupt lower ones.")
+        self._priority_spin.valueChanged.connect(self._on_changed)
+        form.addRow("Priority:", self._priority_spin)
+
+        color_layout = QHBoxLayout()
+        self._color_btn = QPushButton()
+        self._color_btn.setFixedSize(24, 24)
+        self._color_btn.setStyleSheet("background-color: #555; border: 1px solid #777; border-radius: 3px;")
+        self._color_btn.clicked.connect(self._on_color_pick)
+        self._color_label = QLabel(" No tag")
+        self._color_label.setStyleSheet("color: #888;")
+        color_layout.addWidget(self._color_btn)
+        color_layout.addWidget(self._color_label)
+        color_layout.addStretch()
+        form.addRow("Color:", color_layout)
 
         self._next_action = QComboBox()
         self._next_action.addItem("Next Cue", NextAction.NextCue)
@@ -179,6 +199,14 @@ class CueEditorPanel(QWidget):
         self._updating = True
 
         self._name_edit.setText(cue.name)
+        self._priority_spin.setValue(cue.priority)
+
+        if cue.color:
+            self._color_btn.setStyleSheet(f"background-color: {cue.color}; border: 1px solid #777; border-radius: 3px;")
+            self._color_label.setText(f" {cue.color}")
+        else:
+            self._color_btn.setStyleSheet("background-color: #555; border: 1px solid #777; border-radius: 3px;")
+            self._color_label.setText(" No tag")
 
         for i in range(self._next_action.count()):
             if self._next_action.itemData(i) == cue.next_action:
@@ -227,6 +255,7 @@ class CueEditorPanel(QWidget):
             return
         cue = self._cue
         cue.name = self._name_edit.text()
+        cue.priority = self._priority_spin.value()
         cue.next_action = self._next_action.currentData()
         cue.fadein_duration = self._fadein_dur.value()
         cue.fadeout_duration = self._fadeout_dur.value()
@@ -238,6 +267,14 @@ class CueEditorPanel(QWidget):
             cue.media.volume = self._media_volume.value()
             cue.media.start_time = int(self._media_start.value() * 1000)
             cue.media.stop_time = int(self._media_stop.value() * 1000)
+
+    def _on_color_pick(self):
+        color = QColorDialog.getColor()
+        if color.isValid():
+            hex_color = color.name()
+            self._cue.color = hex_color
+            self._color_btn.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #777; border-radius: 3px;")
+            self._color_label.setText(f" {hex_color}")
 
     def _on_save(self):
         self._on_changed()

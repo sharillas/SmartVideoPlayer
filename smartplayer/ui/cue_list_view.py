@@ -228,6 +228,14 @@ class CueListView(QWidget):
 
         self._pending_go = True
 
+        # Priority check: stop running cues with lower priority
+        if self._current_cue and self._current_cue.state & CueState.IsRunning:
+            if self._current_cue.priority <= cue.priority:
+                self._current_cue.execute(CueAction.Stop)
+            else:
+                self._pending_go = False
+                return
+
         if isinstance(cue, MediaCue) and self._is_video_file(cue.media.uri):
             if self._display_enabled:
                 video_widget = self._video_manager.active_widget()

@@ -57,6 +57,13 @@ class MediaCue(Cue):
         if self._player is not None:
             self._player.setPosition(0)
             self._player.play()
+        # Reconnect position monitoring for PauseKeepLast
+        try:
+            self._player.positionChanged.disconnect(self._on_position_changed)
+        except Exception:
+            pass
+        if self.next_action == NextAction.PauseKeepLast:
+            self._player.positionChanged.connect(self._on_position_changed)
 
     def _do_stop(self):
         if self._player is not None:
@@ -98,10 +105,6 @@ class MediaCue(Cue):
             self.state = CueState.Pause
             self.paused.emit()
             self.end.emit()
-            try:
-                self._player.positionChanged.disconnect(self._on_position_changed)
-            except Exception:
-                pass
 
     def _on_playback_state(self, state):
         pass
