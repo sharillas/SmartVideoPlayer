@@ -15,7 +15,9 @@ class VideoOutputWindow(QMainWindow):
         self.setCentralWidget(self._video_widget)
         self._is_fullscreen = False
         self._target_screen_index = -1
-        self._status_bar = None
+        self._custom_width = 800
+        self._custom_height = 600
+        self._output_mode = "fullscreen"  # fullscreen | windowed | custom
 
     @property
     def video_widget(self) -> QVideoWidget:
@@ -24,13 +26,22 @@ class VideoOutputWindow(QMainWindow):
     def set_target_screen(self, index: int):
         self._target_screen_index = index
 
-    def show_as_window(self):
+    def set_custom_resolution(self, w: int, h: int):
+        self._custom_width = w
+        self._custom_height = h
+
+    def set_output_mode(self, mode: str):
+        self._output_mode = mode
+
+    def show_as_window(self, width: int = 800, height: int = 600):
+        self._custom_width = width
+        self._custom_height = height
         self.setWindowFlags(
             Qt.WindowType.Window |
             Qt.WindowType.WindowStaysOnTopHint
         )
         self.setWindowTitle("SmartPlayer - Video Output")
-        self.resize(800, 600)
+        self.resize(width, height)
         self.showNormal()
 
     def go_fullscreen_on_screen(self, screen_index: int):
@@ -48,6 +59,24 @@ class VideoOutputWindow(QMainWindow):
             self.showFullScreen()
             self._is_fullscreen = True
 
+    def go_custom_windowed(self, screen_index: int, w: int, h: int, x: int = 0, y: int = 0):
+        screens = QGuiApplication.screens()
+        if 0 <= screen_index < len(screens):
+            target_screen = screens[screen_index]
+            screen_geo = target_screen.geometry()
+            self.setWindowFlags(
+                Qt.WindowType.Window |
+                Qt.WindowType.WindowStaysOnTopHint
+            )
+            self.setWindowTitle("SmartPlayer - Video Output")
+            self.setGeometry(
+                screen_geo.x() + x,
+                screen_geo.y() + y,
+                w, h
+            )
+            self.showNormal()
+            self._is_fullscreen = False
+
     def exit_fullscreen(self):
         if self._is_fullscreen:
             self._video_widget.setFullScreen(False)
@@ -62,7 +91,7 @@ class VideoOutputWindow(QMainWindow):
 
     def show_windowed(self):
         self.exit_fullscreen()
-        self.show_as_window()
+        self.show_as_window(self._custom_width, self._custom_height)
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key.Key_Escape:
@@ -70,8 +99,9 @@ class VideoOutputWindow(QMainWindow):
         elif event.key() in (Qt.Key.Key_F, Qt.Key.Key_F11):
             if self._is_fullscreen:
                 self.exit_fullscreen()
+                self.show_as_window(self._custom_width, self._custom_height)
             else:
-                self.show_windowed()
+                self.go_fullscreen_on_screen(self._target_screen_index)
         super().keyPressEvent(event)
 
     def closeEvent(self, event):
