@@ -48,6 +48,7 @@ class MediaCue(Cue):
                 self._player.setVideoOutput(self._video_output)
             self._player.mediaStatusChanged.connect(self._on_media_status)
             self._player.playbackStateChanged.connect(self._on_playback_state)
+            self._player.positionChanged.connect(self._on_position_changed)
         if self.media.uri:
             self._player.setSource(QUrl.fromLocalFile(self.media.uri))
 
@@ -81,15 +82,26 @@ class MediaCue(Cue):
                 self._player.setPosition(0)
                 self._player.play()
             elif keep_last:
-                # Pause 1 second before end to show last frame with 00:00:01 remaining
-                dur = self._player.duration()
-                self._player.setPosition(max(0, dur - 1000))
-                self._player.pause()
-                self.state = CueState.Pause
-                self.paused.emit()
-                self.end.emit()
+                # Already handled by position monitoring
+                pass
             else:
                 self._do_stop()
+
+    def _on_position_changed(self, position):
+        if self.next_action != NextAction.PauseKeepLast:
+            return
+        dur = self._player.duration()
+        if dur > 0 and position >= dur - 150:
+            self._player.pause()
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(50, lambda: self._player.setPosition(dur - 100))
+            self.state = CueState.Pause
+            self.paused.emit()
+            self.end.emit()
+            try:
+                self._player.positionChanged.disconnect(self._on_position_changed)
+            except Exception:
+                pass
 
     def _on_playback_state(self, state):
         pass
