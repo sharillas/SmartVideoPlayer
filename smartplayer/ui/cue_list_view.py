@@ -80,10 +80,6 @@ class CueListView(QWidget):
         if self._video_manager.has_external_display:
             self._display_btn.setText("EXT DISPLAY ON")
         header.addWidget(self._display_btn)
-
-        self._status_label = QLabel("Ready")
-        self._status_label.setStyleSheet("color: #666; font-size: 11px;")
-        header.addWidget(self._status_label)
         layout.addLayout(header)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -218,12 +214,10 @@ class CueListView(QWidget):
     def _on_undo(self):
         text = self._undo_stack.undo()
         self._table_model.refresh()
-        self._status_label.setText(text if text else "Nothing to undo")
 
     def _on_redo(self):
         text = self._undo_stack.redo()
         self._table_model.refresh()
-        self._status_label.setText(text if text else "Nothing to redo")
 
     def _on_go(self):
         if self._pending_go:
@@ -250,7 +244,6 @@ class CueListView(QWidget):
 
         self._progress_timer.start()
         self._table_model.refresh_row(self._current_row)
-        self._status_label.setText(f"GO [{self._standby_index + 1}] {cue.name}")
         self._pending_go = False
 
     def _on_cue_ended(self):
@@ -269,7 +262,6 @@ class CueListView(QWidget):
             self._table_model.current_position = old_cue.duration if old_cue.duration > 0 else 0
             self._table_model.refresh_row(old_row)
             self._table.viewport().update()
-            self._status_label.setText(f"PAUSED LAST FRAME [{old_row + 1}] {old_cue.name}")
             return
 
         self._progress_timer.stop()
@@ -332,7 +324,6 @@ class CueListView(QWidget):
                 self._current_cue = None
                 self._current_row = -1
             self._table_model.refresh_row(self._standby_index)
-            self._status_label.setText(f"STOP [{self._standby_index + 1}] {cue.name}")
 
     def _on_pause(self):
         cue = self._cue_model.cue_at(self._standby_index)
@@ -348,9 +339,6 @@ class CueListView(QWidget):
                 self._pause_btn.setStyleSheet(STYLE_INFO)
                 self._progress_timer.stop()
             self._table_model.refresh_row(self._standby_index)
-            self._status_label.setText(
-                f"{'RESUME' if cue.state == CueState.Running else 'PAUSE'} [{self._standby_index + 1}] {cue.name}"
-            )
 
     def _on_stop_all(self):
         self._cue_model.stop_all()
@@ -361,7 +349,6 @@ class CueListView(QWidget):
         self._current_cue = None
         self._current_row = -1
         self._table_model.refresh()
-        self._status_label.setText("ALL OFF")
 
     def _on_add_media(self):
         files, _ = QFileDialog.getOpenFileNames(
@@ -394,7 +381,6 @@ class CueListView(QWidget):
             )
 
         self._table_model.refresh()
-        self._status_label.setText(f"ADDED {len(files)} file(s)")
 
     def _redo_add(self, data: dict, index: int):
         cue = CueFactory.from_dict(data)
@@ -432,7 +418,6 @@ class CueListView(QWidget):
         if self._standby_index >= len(self._cue_model):
             self._standby_index = max(0, len(self._cue_model) - 1)
         self._editor_panel.set_cue(None)
-        self._status_label.setText(f"REMOVED {cue.name}")
 
     def _on_cue_clicked(self, index):
         row = index.row()

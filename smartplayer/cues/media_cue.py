@@ -81,6 +81,9 @@ class MediaCue(Cue):
                 self._player.setPosition(0)
                 self._player.play()
             elif keep_last:
+                # Pause 1 second before end to show last frame with 00:00:01 remaining
+                dur = self._player.duration()
+                self._player.setPosition(max(0, dur - 1000))
                 self._player.pause()
                 self.state = CueState.Pause
                 self.paused.emit()
