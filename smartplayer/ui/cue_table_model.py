@@ -61,7 +61,7 @@ class CueTableModel(QAbstractTableModel):
     COL_ACTIONS = 6
     COL_COUNT = 7
 
-    HEADERS = ["Cue", "Name", "Remaining", "Duration", "Next", "Out", ""]
+    HEADERS = ["Cue", "Name", "Remaining", "Duration", "Next", "Out", "Actions"]
 
     CueRole = Qt.ItemDataRole.UserRole + 1
     StateRole = Qt.ItemDataRole.UserRole + 2
@@ -115,12 +115,7 @@ class CueTableModel(QAbstractTableModel):
             elif col == self.COL_OUTPUT:
                 return str(cue.output_target + 1)
             elif col == self.COL_ACTIONS:
-                state = cue.state
-                if state & CueState.Running:
-                    return "\u23F9"  # ⏹ stop
-                elif state & CueState.Pause:
-                    return "\u25B6"  # ▶ resume
-                return "\u25B6"  # ▶ play
+                return ""
 
         if role == Qt.ItemDataRole.ForegroundRole:
             return QColor("#ffffff") if cue.state & CueState.Running else QColor("#cccccc")
