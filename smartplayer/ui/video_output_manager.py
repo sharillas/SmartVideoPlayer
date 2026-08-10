@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -22,7 +24,16 @@ class VideoOutputManager:
         self._window: VideoOutputWindow | None = None
         self._pattern_player = None
         self._pattern_audio = None
+        self._last_pattern = None
         self._screen_count = len(QGuiApplication.screens())
+
+        # Default test pattern (bundled in resources)
+        bundled_pattern = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "resources", "grid_pattern.png"
+        )
+        if os.path.exists(bundled_pattern):
+            self._last_pattern = bundled_pattern
         self._output_screen_index = 1 if self._screen_count > 1 else 0
         self._output_mode = "fullscreen"  # fullscreen | windowed | custom
         self._custom_width = 1920
@@ -100,6 +111,18 @@ class VideoOutputManager:
         if self._pattern_player is not None:
             self._pattern_player.stop()
 
+    def is_pattern_playing(self) -> bool:
+        if self._pattern_player is not None:
+            return self._pattern_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+        return False
+
+    def has_test_pattern(self) -> bool:
+        return self._last_pattern is not None
+
+    def show_last_pattern(self):
+        if self._last_pattern:
+            self.show_test_pattern(self._last_pattern)
+
     def force_hide(self):
         if self._window is not None:
             self._window.exit_fullscreen()
@@ -113,7 +136,7 @@ class VideoOutputManager:
 
     def show_black_screen(self):
         self._ensure_window()
-        if self._pattern_player is not None:
+        if self._pattern_player:
             self._pattern_player.stop()
         if self.has_external_display:
             if self._output_mode == "custom":
@@ -126,6 +149,7 @@ class VideoOutputManager:
                 self._window.go_fullscreen_on_screen(self._output_screen_index)
 
     def show_test_pattern(self, filepath: str):
+        self._last_pattern = filepath
         self._ensure_window()
         if self.has_external_display:
             if self._output_mode == "custom":
@@ -139,7 +163,7 @@ class VideoOutputManager:
         else:
             self._window.show_as_window(self._custom_width, self._custom_height)
 
-        if not hasattr(self, '_pattern_player') or self._pattern_player is None:
+        if self._pattern_player is None:
             self._pattern_player = QMediaPlayer()
             self._pattern_audio = QAudioOutput()
             self._pattern_player.setAudioOutput(self._pattern_audio)

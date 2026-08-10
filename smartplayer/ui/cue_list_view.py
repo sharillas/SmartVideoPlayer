@@ -80,6 +80,31 @@ class CueListView(QWidget):
         if self._video_manager.has_external_display:
             self._display_btn.setText("EXT DISPLAY ON")
         header.addWidget(self._display_btn)
+
+        self._pattern_btn = QPushButton("PATTERN OFF")
+        self._pattern_btn.setMinimumHeight(28)
+        self._pattern_btn.setStyleSheet(STYLE_DARK)
+        self._pattern_btn.clicked.connect(self._toggle_pattern)
+        header.addWidget(self._pattern_btn)
+
+        self._add_btn = QPushButton("Add Media")
+        self._add_btn.setMinimumHeight(28)
+        self._add_btn.setStyleSheet(STYLE_DARK)
+        self._add_btn.clicked.connect(self._on_add_media)
+        header.addWidget(self._add_btn)
+
+        self._remove_btn = QPushButton("Remove")
+        self._remove_btn.setMinimumHeight(28)
+        self._remove_btn.setStyleSheet(STYLE_DARK)
+        self._remove_btn.clicked.connect(self._on_remove)
+        header.addWidget(self._remove_btn)
+
+        self._stop_all_btn = QPushButton("Stop All")
+        self._stop_all_btn.setMinimumHeight(28)
+        self._stop_all_btn.setStyleSheet(STYLE_DARK)
+        self._stop_all_btn.clicked.connect(self._on_stop_all)
+        header.addWidget(self._stop_all_btn)
+
         layout.addLayout(header)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -147,26 +172,6 @@ class CueListView(QWidget):
         self._pause_btn.clicked.connect(self._on_pause)
         controls.addWidget(self._pause_btn)
 
-        controls.addStretch()
-
-        self._stop_all_btn = QPushButton("ALL OFF")
-        self._stop_all_btn.setMinimumHeight(36)
-        self._stop_all_btn.setStyleSheet(STYLE_DARK)
-        self._stop_all_btn.clicked.connect(self._on_stop_all)
-        controls.addWidget(self._stop_all_btn)
-
-        self._add_btn = QPushButton("+ ADD")
-        self._add_btn.setMinimumHeight(36)
-        self._add_btn.setStyleSheet(STYLE_DARK)
-        self._add_btn.clicked.connect(self._on_add_media)
-        controls.addWidget(self._add_btn)
-
-        self._remove_btn = QPushButton("DEL")
-        self._remove_btn.setMinimumHeight(36)
-        self._remove_btn.setStyleSheet(STYLE_DARK)
-        self._remove_btn.clicked.connect(self._on_remove)
-        controls.addWidget(self._remove_btn)
-
         layout.addLayout(controls)
 
         vol_bar = QHBoxLayout()
@@ -210,6 +215,32 @@ class CueListView(QWidget):
             self._display_btn.setStyleSheet(STYLE_DISPLAY_OFF)
             self._display_btn.setText("DISPLAY OFF")
             self._video_manager.force_hide()
+
+    def _toggle_pattern(self):
+        if self._video_manager.is_pattern_playing():
+            self._video_manager.stop_pattern()
+            self._update_pattern_btn(False)
+            self._video_manager.show_black_screen()
+        elif self._video_manager.has_test_pattern():
+            self._video_manager.show_last_pattern()
+            self._update_pattern_btn(True)
+
+    def _update_pattern_btn(self, playing: bool):
+        if not self._video_manager.has_test_pattern():
+            self._pattern_btn.setText("NO PATTERN")
+            self._pattern_btn.setStyleSheet(STYLE_DISPLAY_OFF)
+            self._pattern_btn.setEnabled(False)
+        elif playing:
+            self._pattern_btn.setText("PATTERN ON")
+            self._pattern_btn.setStyleSheet(STYLE_DISPLAY_ON)
+            self._pattern_btn.setEnabled(True)
+        else:
+            self._pattern_btn.setText("PATTERN OFF")
+            self._pattern_btn.setStyleSheet(STYLE_DARK)
+            self._pattern_btn.setEnabled(True)
+
+    def refresh_pattern_btn(self):
+        self._update_pattern_btn(self._video_manager.is_pattern_playing())
 
     def _on_undo(self):
         text = self._undo_stack.undo()

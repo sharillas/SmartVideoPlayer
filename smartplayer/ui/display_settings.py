@@ -128,7 +128,7 @@ class DisplaySettingsDialog(QDialog):
         self._show_pattern_btn.clicked.connect(self._on_show_pattern)
         row2.addWidget(self._show_pattern_btn)
 
-        self._off_pattern_btn = QPushButton("Off Pattern")
+        self._off_pattern_btn = QPushButton("Off (Black)")
         self._off_pattern_btn.clicked.connect(self._on_hide_test)
         row2.addWidget(self._off_pattern_btn)
         test_layout.addLayout(row2)
@@ -185,7 +185,7 @@ class DisplaySettingsDialog(QDialog):
 
     def _on_hide_test(self):
         self._vm.stop_pattern()
-        self._vm.force_hide()
+        self._vm.show_black_screen()
 
     def _load_values(self):
         for i in range(self._screen_combo.count()):

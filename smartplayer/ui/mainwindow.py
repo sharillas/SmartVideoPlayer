@@ -164,6 +164,8 @@ class MainWindow(QMainWindow):
     def _on_display_settings(self):
         dlg = DisplaySettingsDialog(self._video_manager, self)
         dlg.exec()
+        if self._cue_view:
+            self._cue_view.refresh_pattern_btn()
 
     def _update_title(self):
         fname = os.path.basename(self._session.filepath) if self._session.filepath else "Untitled"
