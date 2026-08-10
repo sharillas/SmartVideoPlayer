@@ -90,6 +90,13 @@ class CueEditorPanel(QWidget):
         color_layout.addStretch()
         form.addRow("Color:", color_layout)
 
+        self._output_target = QSpinBox()
+        self._output_target.setRange(1, 8)
+        self._output_target.setValue(1)
+        self._output_target.setToolTip("Which output screen this cue plays on (1=primary, 2=secondary, etc.)")
+        self._output_target.valueChanged.connect(self._on_changed)
+        form.addRow("Output:", self._output_target)
+
         self._next_action = QComboBox()
         self._next_action.addItem("Next Cue", NextAction.NextCue)
         self._next_action.addItem("Previous Cue", NextAction.PreviousCue)
@@ -200,6 +207,7 @@ class CueEditorPanel(QWidget):
 
         self._name_edit.setText(cue.name)
         self._priority_spin.setValue(cue.priority)
+        self._output_target.setValue(cue.output_target + 1)
 
         if cue.color:
             self._color_btn.setStyleSheet(f"background-color: {cue.color}; border: 1px solid #777; border-radius: 3px;")
@@ -256,6 +264,7 @@ class CueEditorPanel(QWidget):
         cue = self._cue
         cue.name = self._name_edit.text()
         cue.priority = self._priority_spin.value()
+        cue.output_target = self._output_target.value() - 1
         cue.next_action = self._next_action.currentData()
         cue.fadein_duration = self._fadein_dur.value()
         cue.fadeout_duration = self._fadeout_dur.value()

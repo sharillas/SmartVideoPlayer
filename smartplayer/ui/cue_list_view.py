@@ -132,6 +132,9 @@ class CueListView(QWidget):
         self._table.setColumnWidth(CueTableModel.COL_OUTPUT, 36)
         self._table.setColumnWidth(CueTableModel.COL_ACTIONS, 30)
         self._table.clicked.connect(self._on_cue_clicked)
+        self._cue_model.item_added.connect(self._refresh_action_buttons)
+        self._cue_model.item_removed.connect(self._refresh_action_buttons)
+        self._cue_model.model_reset.connect(self._refresh_action_buttons)
         self._table.setStyleSheet(
             "QTableView { border: 1px solid #3a3a3a; }"
             "QTableView::item { padding: 5px 6px; }"
@@ -243,6 +246,68 @@ class CueListView(QWidget):
 
     def refresh_pattern_btn(self):
         self._update_pattern_btn(self._video_manager.is_pattern_playing())
+
+    def _refresh_action_buttons(self):
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(10, self._do_refresh_buttons)
+
+    def _do_refresh_buttons(self):
+        btn_play = "QPushButton { background-color: #2E7D32; color: #fff; border: none; border-radius: 2px; padding: 2px 6px; font-size: 12px; font-weight: bold; } QPushButton:hover { background-color: #388E3C; }"
+        btn_stop = "QPushButton { background-color: #C62828; color: #fff; border: none; border-radius: 2px; padding: 2px 6px; font-size: 12px; font-weight: bold; } QPushButton:hover { background-color: #D32F2F; }"
+        btn_pause = "QPushButton { background-color: #E65100; color: #fff; border: none; border-radius: 2px; padding: 2px 6px; font-size: 12px; font-weight: bold; } QPushButton:hover { background-color: #EF6C00; }"
+
+        for row in range(self._table_model.rowCount()):
+            cue = self._cue_model.cue_at(row)
+            if cue is None:
+                continue
+
+            container = QWidget()
+            layout = QHBoxLayout(container)
+            layout.setContentsMargins(1, 1, 1, 1)
+            layout.setSpacing(2)
+
+            state = cue.state
+            if state & CueState.Running:
+                b1 = QPushButton("\u25A0")
+                b1.setFixedSize(22, 22); b1.setStyleSheet(btn_stop); b1.setToolTip("Stop")
+                b1.clicked.connect(lambda checked, r=row: self._stop_cue_at(r))
+                layout.addWidget(b1)
+                b2 = QPushButton("\u23F8")
+                b2.setFixedSize(22, 22); b2.setStyleSheet(btn_pause); b2.setToolTip("Pause")
+                b2.clicked.connect(lambda checked, r=row: self._pause_cue_at(r))
+                layout.addWidget(b2)
+            elif state & CueState.Pause:
+                b1 = QPushButton("\u25A0")
+                b1.setFixedSize(22, 22); b1.setStyleSheet(btn_stop)
+                b1.clicked.connect(lambda checked, r=row: self._stop_cue_at(r))
+                layout.addWidget(b1)
+                b2 = QPushButton("\u25B6")
+                b2.setFixedSize(22, 22); b2.setStyleSheet(btn_play); b2.setToolTip("Resume")
+                b2.clicked.connect(lambda checked, r=row: self._resume_cue_at(r))
+                layout.addWidget(b2)
+            else:
+                b = QPushButton("\u25B6")
+                b.setFixedSize(22, 22); b.setStyleSheet(btn_play); b.setToolTip("Play")
+                b.clicked.connect(lambda checked, r=row: self._play_cue_at(r))
+                layout.addWidget(b)
+
+            self._table.setIndexWidget(self._table_model.index(row, CueTableModel.COL_ACTIONS), container)
+
+    def _play_cue_at(self, row: int):
+        cue = self._cue_model.cue_at(row)
+        if cue: self._play_cue(cue, row); self._do_refresh_buttons()
+
+    def _stop_cue_at(self, row: int):
+        cue = self._cue_model.cue_at(row)
+        if cue: cue.execute(CueAction.Stop); self._table_model.refresh_row(row); self._do_refresh_buttons()
+
+    def _pause_cue_at(self, row: int):
+        cue = self._cue_model.cue_at(row)
+        if cue: cue.execute(CueAction.Pause); self._table_model.refresh_row(row); self._do_refresh_buttons()
+
+    def _resume_cue_at(self, row: int):
+        cue = self._cue_model.cue_at(row)
+        if cue: cue.execute(CueAction.Resume); self._table_model.refresh_row(row); self._do_refresh_buttons()
 
     def _on_undo(self):
         text = self._undo_stack.undo()
@@ -450,26 +515,11 @@ class CueListView(QWidget):
         if cue is None:
             return
 
-        # Actions column: Play/Stop toggle
+        # Skip actions column (handled by buttons)
         if col == CueTableModel.COL_ACTIONS:
-            if cue.state & CueState.Running:
-                cue.execute(CueAction.Stop)
-                self._table_model.refresh_row(row)
-            elif cue.state & CueState.Pause:
-                cue.execute(CueAction.Resume)
-                self._table_model.refresh_row(row)
-            else:
-                self._play_cue(cue, row)
             return
 
-        # Output column: cycle target
-        if col == CueTableModel.COL_OUTPUT:
-            max_screens = self._video_manager.screen_count
-            cue.output_target = (cue.output_target + 1) % max(1, max_screens)
-            self._table_model.refresh_row(row)
-            return
-
-        # Default: select and edit
+        # Select and edit
         self._standby_index = row
         self._table.selectRow(row)
         self._editor_panel.set_cue(cue)
