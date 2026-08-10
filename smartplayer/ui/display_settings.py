@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
     QComboBox, QPushButton, QGroupBox, QDialogButtonBox, QMessageBox,
-    QSpinBox, QCheckBox
+    QSpinBox, QCheckBox, QFileDialog
 )
 from PySide6.QtCore import Qt
 
@@ -107,15 +107,37 @@ class DisplaySettingsDialog(QDialog):
 
         layout.addWidget(mode_group)
 
-        # Test button
-        test_layout = QHBoxLayout()
-        self._test_btn = QPushButton("Test Output (Black Screen)")
-        self._test_btn.clicked.connect(self._on_test)
-        test_layout.addWidget(self._test_btn)
+        # Test buttons
+        test_group = QGroupBox("Output Preview / Test Patterns")
+        test_layout = QVBoxLayout(test_group)
+
+        row1 = QHBoxLayout()
+        self._test_btn = QPushButton("Black Output")
+        self._test_btn.clicked.connect(self._on_test_black)
+        row1.addWidget(self._test_btn)
+
+        self._pattern_btn = QPushButton("Load Test Pattern...")
+        self._pattern_btn.clicked.connect(self._on_load_pattern)
+        row1.addWidget(self._pattern_btn)
+        test_layout.addLayout(row1)
+
+        row2 = QHBoxLayout()
+        self._pattern_label = QLabel("No pattern loaded")
+        self._pattern_label.setStyleSheet("color: #888; font-size: 11px;")
+        self._pattern_label.setWordWrap(True)
+        row2.addWidget(self._pattern_label, 1)
+
+        self._show_pattern_btn = QPushButton("Show Pattern")
+        self._show_pattern_btn.setEnabled(False)
+        self._show_pattern_btn.clicked.connect(self._on_show_pattern)
+        row2.addWidget(self._show_pattern_btn)
+
         self._hide_btn = QPushButton("Hide Output")
         self._hide_btn.clicked.connect(self._on_hide_test)
-        test_layout.addWidget(self._hide_btn)
-        layout.addLayout(test_layout)
+        row2.addWidget(self._hide_btn)
+        test_layout.addLayout(row2)
+
+        layout.addWidget(test_group)
 
         layout.addSpacing(8)
 
@@ -147,6 +169,27 @@ class DisplaySettingsDialog(QDialog):
             w, h = data
             self._width_spin.setValue(w)
             self._height_spin.setValue(h)
+
+    def _on_test_black(self):
+        self._apply_to_manager()
+        self._vm.show_black_screen()
+
+    def _on_load_pattern(self):
+        filepath, _ = QFileDialog.getOpenFileName(
+            self, "Select Test Pattern",
+            "",
+            "Images & Video (*.png *.jpg *.jpeg *.tiff *.tif *.bmp *.gif *.mp4 *.avi *.mov *.wmv *.webm);;All Files (*.*)"
+        )
+        if filepath:
+            self._pattern_path = filepath
+            import os
+            self._pattern_label.setText(os.path.basename(filepath))
+            self._show_pattern_btn.setEnabled(True)
+
+    def _on_show_pattern(self):
+        self._apply_to_manager()
+        if hasattr(self, '_pattern_path') and self._pattern_path:
+            self._vm.show_test_pattern(self._pattern_path)
 
     def _on_test(self):
         self._apply_to_manager()
