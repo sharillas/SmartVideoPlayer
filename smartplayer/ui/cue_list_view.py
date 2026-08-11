@@ -659,22 +659,20 @@ class CueListView(QWidget):
         # Route video first
         if isinstance(cue, MediaCue) and self._is_video_file(cue.media.uri):
             if self._display_enabled:
-                widget = self._video_manager.render_widget_for(cue.output_target)
+                widget = self._video_manager.video_widget_for(cue.output_target)
                 cue.set_video_output(widget)
 
-        # Stop old cues on same output, collect max fadeout time
-        stop_delay = 0
+        # Stop old cues on same output immediately (no fade)
         for other in self._cue_model.cues():
             if other is not cue and other.output_target == cue.output_target:
                 if other.state & (CueState.Running | CueState.Pause):
-                    if isinstance(other, MediaCue):
-                        stop_delay = max(stop_delay, other.fadeout_duration)
-                    other.execute(CueAction.Stop)
+                    if hasattr(other, 'stop_immediate'):
+                        other.stop_immediate()
+                    else:
+                        other.execute(CueAction.Stop)
 
-        # Start new after stop delay
-        from PySide6.QtCore import QTimer
-        delay = max(stop_delay, 0) + 50
-        QTimer.singleShot(delay, lambda r=row: self._start_cue_delayed(r))
+        # Start new cue immediately
+        self._start_cue_delayed(row)
 
     def _start_cue_delayed(self, row: int):
         cue = self._cue_model.cue_at(row)
@@ -692,7 +690,7 @@ class CueListView(QWidget):
         # Route video output for the new cue first
         if isinstance(cue, MediaCue) and self._is_video_file(cue.media.uri):
             if self._display_enabled:
-                widget = self._video_manager.render_widget_for(cue.output_target)
+                widget = self._video_manager.video_widget_for(cue.output_target)
                 cue.set_video_output(widget)
             else:
                 cue.set_video_output(None)

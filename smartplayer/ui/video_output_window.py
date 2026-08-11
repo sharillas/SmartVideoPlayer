@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QMainWindow, QWidget
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeyEvent, QGuiApplication
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout
+from PySide6.QtMultimediaWidgets import QVideoWidget
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QKeyEvent, QScreen, QGuiApplication
 
 
 class VideoOutputWindow(QMainWindow):
@@ -10,18 +11,16 @@ class VideoOutputWindow(QMainWindow):
         super().__init__(parent)
         self.setWindowTitle("SmartPlayer - Video Output")
         self.setStyleSheet("background-color: #000000;")
-        self._render_widget = QWidget()
-        self._render_widget.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
-        self._render_widget.setAttribute(Qt.WidgetAttribute.WA_DontCreateNativeAncestors, True)
-        self.setCentralWidget(self._render_widget)
+        self._video_widget = QVideoWidget()
+        self.setCentralWidget(self._video_widget)
         self._is_fullscreen = False
         self._target_screen_index = -1
         self._custom_width = 800
         self._custom_height = 600
 
     @property
-    def render_widget(self) -> QWidget:
-        return self._render_widget
+    def video_widget(self) -> QVideoWidget:
+        return self._video_widget
 
     def set_target_screen(self, index: int):
         self._target_screen_index = index
