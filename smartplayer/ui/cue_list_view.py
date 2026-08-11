@@ -71,7 +71,29 @@ class CueListView(QWidget):
         layout.setSpacing(4)
 
         header = QHBoxLayout()
-        header.setSpacing(8)
+        header.setSpacing(4)
+
+        self._go_btn = QPushButton("GO")
+        self._go_btn.setMinimumHeight(28)
+        self._go_btn.setMinimumWidth(50)
+        self._go_btn.setStyleSheet(STYLE_PRIMARY)
+        self._go_btn.clicked.connect(self._on_go)
+        header.addWidget(self._go_btn)
+
+        self._stop_btn = QPushButton("STOP")
+        self._stop_btn.setMinimumHeight(28)
+        self._stop_btn.setMinimumWidth(50)
+        self._stop_btn.setStyleSheet(STYLE_DANGER)
+        self._stop_btn.clicked.connect(self._on_stop)
+        header.addWidget(self._stop_btn)
+
+        self._pause_btn = QPushButton("PAUSE")
+        self._pause_btn.setMinimumHeight(28)
+        self._pause_btn.setMinimumWidth(55)
+        self._pause_btn.setStyleSheet(STYLE_WARN)
+        self._pause_btn.clicked.connect(self._on_pause)
+        header.addWidget(self._pause_btn)
+
         header.addStretch()
 
         self._display_btn = QPushButton("DISPLAY ON")
@@ -123,30 +145,38 @@ class CueListView(QWidget):
         self._table.setAlternatingRowColors(True)
         self._table.setSortingEnabled(False)
         self._table.verticalHeader().setVisible(False)
-        self._table.verticalHeader().setDefaultSectionSize(28)
+        self._table.verticalHeader().setDefaultSectionSize(30)
         self._table.horizontalHeader().setStretchLastSection(True)
         self._table.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignLeft)
         self._table.setColumnWidth(CueTableModel.COL_INDEX, 32)
-        self._table.setColumnWidth(CueTableModel.COL_NAME, 180)
+        self._table.setColumnWidth(CueTableModel.COL_NAME, 120)
         self._table.setColumnWidth(CueTableModel.COL_REMAINING, 80)
         self._table.setColumnWidth(CueTableModel.COL_DURATION, 75)
-        self._table.setColumnWidth(CueTableModel.COL_NEXT, 36)
-        self._table.setColumnWidth(CueTableModel.COL_OUTPUT, 36)
-        self._table.setColumnWidth(CueTableModel.COL_ACTIONS, 72)
+        self._table.setColumnWidth(CueTableModel.COL_SIZE, 55)
+        self._table.setColumnWidth(CueTableModel.COL_RESOLUTION, 95)
+        self._table.setColumnWidth(CueTableModel.COL_CODEC, 130)
+        self._table.setColumnWidth(CueTableModel.COL_EXTENSION, 36)
+        self._table.setColumnWidth(CueTableModel.COL_NEXT, 34)
+        self._table.setColumnWidth(CueTableModel.COL_OUTPUT, 45)
+        self._table.setColumnWidth(CueTableModel.COL_ACTIONS, 92)
         self._table.clicked.connect(self._on_cue_clicked)
+        self._table.doubleClicked.connect(self._on_cue_double_clicked)
+        self._table.resizeColumnsToContents()
+        self._table.horizontalHeader().setStretchLastSection(True)
         self._table_model.rowsInserted.connect(self._on_rows_changed)
         self._table_model.rowsRemoved.connect(self._on_rows_changed)
         self._table_model.modelReset.connect(self._on_rows_changed)
         self._table.setStyleSheet(
             "QTableView { border: 1px solid #3a3a3a; }"
             "QTableView::item { padding: 2px 6px; }"
-            "QTableView::item:selected { background-color: #1565C0; color: #fff; }"
+            "QTableView::item:selected { background-color: transparent; color: #fff; }"
         )
         left_layout.addWidget(self._table)
 
         splitter.addWidget(left_widget)
 
         self._editor_panel = CueEditorPanel(self._undo_stack)
+        self._editor_panel.set_refresh_callback(lambda: self._table_model.refresh())
         splitter.addWidget(self._editor_panel)
 
         splitter.setSizes([600, 320])
@@ -157,27 +187,6 @@ class CueListView(QWidget):
 
         controls = QHBoxLayout()
         controls.setSpacing(4)
-
-        self._go_btn = QPushButton("GO")
-        self._go_btn.setMinimumHeight(36)
-        self._go_btn.setMinimumWidth(70)
-        self._go_btn.setStyleSheet(STYLE_PRIMARY)
-        self._go_btn.clicked.connect(self._on_go)
-        controls.addWidget(self._go_btn)
-
-        self._stop_btn = QPushButton("STOP")
-        self._stop_btn.setMinimumHeight(36)
-        self._stop_btn.setMinimumWidth(60)
-        self._stop_btn.setStyleSheet(STYLE_DANGER)
-        self._stop_btn.clicked.connect(self._on_stop)
-        controls.addWidget(self._stop_btn)
-
-        self._pause_btn = QPushButton("PAUSE")
-        self._pause_btn.setMinimumHeight(36)
-        self._pause_btn.setMinimumWidth(60)
-        self._pause_btn.setStyleSheet(STYLE_WARN)
-        self._pause_btn.clicked.connect(self._on_pause)
-        controls.addWidget(self._pause_btn)
 
         layout.addLayout(controls)
 
@@ -272,9 +281,11 @@ class CueListView(QWidget):
             container = QWidget()
             container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
             container.setStyleSheet("background: transparent; border: none;")
+            container.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             layout = QHBoxLayout(container)
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.setSpacing(1)
+            layout.setContentsMargins(2, 0, 0, 0)
+            layout.setSpacing(2)
+            layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
             b_play = QPushButton("\u25B6")
             b_play.setFixedSize(20, 20)
@@ -291,14 +302,26 @@ class CueListView(QWidget):
             b_pause = QPushButton("||")
             b_pause.setFixedSize(20, 20)
             b_pause.setStyleSheet(pause_style)
+            b_pause.setToolTip("Pause")
             b_pause.clicked.connect(partial(self._pause_cue_at, row))
             layout.addWidget(b_pause)
+
+            # B toggle: purple = fade from black ON, gray = fade OFF (frame 1)
+            has_fade = cue.fadein_duration > 0
+            b_on  = "QPushButton { background-color: #7B1FA2; color: #fff; border: 1px solid #9C27B0; border-radius: 3px; padding: 0px 3px; font-size: 10px; font-weight: bold; } QPushButton:hover { background-color: #8E24AA; }"
+            b_off = "QPushButton { background-color: #333; color: #555; border: 1px solid #444; border-radius: 3px; padding: 0px 3px; font-size: 10px; } QPushButton:hover { background-color: #555; color: #aaa; }"
+            b_fade = QPushButton("B")
+            b_fade.setFixedSize(20, 20)
+            b_fade.setStyleSheet(b_on if has_fade else b_off)
+            b_fade.setToolTip("Fade from Black: ON" if has_fade else "Fade from Black: OFF (instant)")
+            b_fade.clicked.connect(partial(self._toggle_cue_fade, row))
+            layout.addWidget(b_fade)
 
             self._table.setIndexWidget(self._table_model.index(row, CueTableModel.COL_ACTIONS), container)
 
         # Force row heights after all widgets are set
         for r in range(self._table_model.rowCount()):
-            self._table.setRowHeight(r, 24)
+            self._table.setRowHeight(r, 30)
 
     def _play_cue_at(self, row: int):
         cue = self._cue_model.cue_at(row)
@@ -306,8 +329,71 @@ class CueListView(QWidget):
             if cue.state & CueState.Pause:
                 cue.execute(CueAction.Resume)
             else:
-                self._play_cue(cue, row)
+                self._launch_with_transition(row)
             self._do_refresh_buttons()
+    def _probe_media_info(self, cue: MediaCue):
+        try:
+            from pymediainfo import MediaInfo
+            path = cue.media.uri
+            if not os.path.exists(path):
+                return
+            mi = MediaInfo.parse(path)
+            container_format = ""
+            video_codec = ""
+            audio_codec = ""
+            has_video = False
+            is_image = False
+            for track in mi.tracks:
+                if track.track_type == 'General':
+                    container_format = track.format or ""
+                elif track.track_type == 'Video':
+                    has_video = True
+                    w = track.width or 0
+                    h = track.height or 0
+                    fps = track.frame_rate or 0
+                    video_codec = track.codec_id or track.format or ""
+                    if isinstance(fps, str):
+                        try: fps = float(fps)
+                        except: fps = 0
+                    if w > 0 and h > 0 and w < 10000 and h < 10000:
+                        if 0 < fps < 120:
+                            cue.media.resolution = f"{w}x{h}@{fps:.0f}fps"
+                        elif fps == 0 and w > 0:
+                            cue.media.resolution = f"{w}x{h}"
+                        else:
+                            cue.media.resolution = f"{w}x{h}"
+                elif track.track_type == 'Audio':
+                    has_audio = True
+                    fmt = track.format or ""
+                    info = track.codec_id_info or ""
+                    sr = track.sampling_rate or 0
+                    ch = getattr(track, 'channel_s', 0) or getattr(track, 'channels', 0) or 0
+                    if info and info != fmt:
+                        audio_codec = f"{info}"
+                    elif fmt:
+                        audio_codec = fmt
+                    if sr > 0:
+                        audio_codec += f" {int(sr/1000)}kHz"
+                    if ch > 0:
+                        audio_codec += f" {ch}ch"
+                elif track.track_type == 'Image':
+                    is_image = True
+                    fmt = track.format or ""
+                    if fmt:
+                        cue.media.codec = fmt.upper()
+            if is_image:
+                pass
+            elif has_video:
+                prefix = f"{container_format} " if container_format else ""
+                codec_str = f"{prefix}{video_codec}"
+                if audio_codec:
+                    cue.media.codec = f"{codec_str} / {audio_codec}"
+                else:
+                    cue.media.codec = f"{codec_str} / No Audio"
+            if hasattr(mi, 'close'):
+                mi.close()
+        except Exception:
+            pass
 
     def _stop_cue_at(self, row: int):
         cue = self._cue_model.cue_at(row)
@@ -316,6 +402,16 @@ class CueListView(QWidget):
     def _pause_cue_at(self, row: int):
         cue = self._cue_model.cue_at(row)
         if cue: cue.execute(CueAction.Pause); self._table_model.refresh_row(row); self._do_refresh_buttons()
+
+    def _toggle_cue_fade(self, row: int):
+        cue = self._cue_model.cue_at(row)
+        if cue is None:
+            return
+        if cue.fadein_duration > 0:
+            cue.fadein_duration = 0
+        else:
+            cue.fadein_duration = 3000
+        self._do_refresh_buttons()
 
     def _on_undo(self):
         text = self._undo_stack.undo()
@@ -390,16 +486,18 @@ class CueListView(QWidget):
             self._table_model.refresh_row(self._current_row)
 
     def _update_progress(self):
-        if self._current_cue is None or self._current_row < 0:
-            return
-        if isinstance(self._current_cue, MediaCue) and self._current_cue.player is not None:
-            player = self._current_cue.player
-            dur = player.duration()
-            pos = player.position()
-            if dur > 0:
-                self._table_model.current_position = pos
-                self._table_model.refresh_row_cell(self._current_row, CueTableModel.COL_REMAINING)
-                self._table.viewport().update()
+        has_running = False
+        for row in range(len(self._cue_model)):
+            cue = self._cue_model.cue_at(row)
+            if cue is None:
+                continue
+            if cue.state & CueState.Running and isinstance(cue, MediaCue):
+                has_running = True
+                self._table_model.refresh_row_cell(row, CueTableModel.COL_REMAINING)
+        if has_running:
+            self._table.viewport().update()
+        else:
+            self._progress_timer.stop()
 
     def _on_stop(self):
         cue = self._cue_model.cue_at(self._standby_index)
@@ -458,6 +556,9 @@ class CueListView(QWidget):
             cue = CueFactory.create("MediaCue")
             cue.name = os.path.basename(filepath)
             cue.media.uri = filepath
+            # Set file info
+            if os.path.exists(filepath):
+                cue.media.file_size = os.path.getsize(filepath)
             self._cue_model.add(cue)
             self._undo_stack.push(LambdaCommand(
                 f"Add {cue.name}",
@@ -465,12 +566,25 @@ class CueListView(QWidget):
                 redo_fn=lambda data=cue.to_dict(), idx=len(self._cue_model)-1: self._redo_add(data, idx)
             ))
 
+            # Probe resolution immediately
+            self._probe_media_info(cue)
+
             temp_player = QMediaPlayer()
             temp_player.setSource(QUrl.fromLocalFile(filepath))
             def _make_loaded_handler(p, c):
                 def _on_loaded(status):
                     if status == QMediaPlayer.MediaStatus.LoadedMedia:
                         c.duration = p.duration()
+                        try:
+                            md = p.metaData()
+                            # Try to get resolution
+                            for key in md.keys():
+                                if 'frame' in str(key).lower() or 'width' in str(key).lower():
+                                    pass  # QMediaMetaData doesn't expose these easily
+                        except Exception:
+                            pass
+                        self._probe_media_info(c)
+                        self._table_model.refresh()
                         p.deleteLater()
                 return _on_loaded
             temp_player.mediaStatusChanged.connect(
@@ -523,27 +637,106 @@ class CueListView(QWidget):
         if cue is None:
             return
 
-        # Skip actions column (handled by buttons)
         if col == CueTableModel.COL_ACTIONS:
             return
 
-        # Select and edit
+        # Single click: select only (no launch)
         self._standby_index = row
         self._table.selectRow(row)
         self._editor_panel.set_cue(cue)
 
-    def _play_cue(self, cue, row: int):
+    def _on_cue_double_clicked(self, index):
+        col = index.column()
+        if col != CueTableModel.COL_INDEX:
+            return
+        row = index.row()
+        self._launch_with_transition(row)
+
+    def _launch_with_transition(self, row: int):
+        cue = self._cue_model.cue_at(row)
+        if cue is None:
+            return
+        # Route video first
         if isinstance(cue, MediaCue) and self._is_video_file(cue.media.uri):
             if self._display_enabled:
-                widget = self._video_manager.video_widget_for(cue.output_target)
+                widget = self._video_manager.render_widget_for(cue.output_target)
                 cue.set_video_output(widget)
-            else:
-                cue.set_video_output(None)
+
+        # Stop old cues on same output, collect max fadeout time
+        stop_delay = 0
+        for other in self._cue_model.cues():
+            if other is not cue and other.output_target == cue.output_target:
+                if other.state & (CueState.Running | CueState.Pause):
+                    if isinstance(other, MediaCue):
+                        stop_delay = max(stop_delay, other.fadeout_duration)
+                    other.execute(CueAction.Stop)
+
+        # Start new after stop delay
+        from PySide6.QtCore import QTimer
+        delay = max(stop_delay, 0) + 50
+        QTimer.singleShot(delay, lambda r=row: self._start_cue_delayed(r))
+
+    def _start_cue_delayed(self, row: int):
+        cue = self._cue_model.cue_at(row)
+        if cue is None:
+            return
         cue.execute(CueAction.Start)
         self._current_cue = cue
         self._current_row = row
         self._table_model.refresh_row(row)
         self._refresh_action_buttons()
+        if not self._progress_timer.isActive():
+            self._progress_timer.start()
+
+    def _play_cue(self, cue, row: int):
+        # Route video output for the new cue first
+        if isinstance(cue, MediaCue) and self._is_video_file(cue.media.uri):
+            if self._display_enabled:
+                widget = self._video_manager.render_widget_for(cue.output_target)
+                cue.set_video_output(widget)
+            else:
+                cue.set_video_output(None)
+
+        # Find running cues on same output to fade out
+        cues_to_stop = []
+        for r, other in enumerate(self._cue_model.cues()):
+            if other is not cue:
+                if other.state & (CueState.Running | CueState.Pause) and other.output_target == cue.output_target:
+                    cues_to_stop.append(other)
+
+        # Transition: fade out old cues, then start new
+        if cues_to_stop:
+            self._transition_start(cue, row, cues_to_stop)
+        else:
+            cue.execute(CueAction.Start)
+            self._current_cue = cue
+            self._current_row = row
+            self._table_model.refresh_row(row)
+            self._refresh_action_buttons()
+            if not self._progress_timer.isActive():
+                self._progress_timer.start()
+
+    def _transition_start(self, new_cue, row: int, old_cues: list):
+        # Fade out all old cues simultaneously
+        max_fade = 0
+        for old in old_cues:
+            old.execute(CueAction.Stop)
+            if isinstance(old, MediaCue) and old.fadeout_duration > max_fade:
+                max_fade = old.fadeout_duration
+
+        # Start new cue after fade out completes + small buffer
+        delay = max_fade + 100 if max_fade > 0 else 300
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(delay, lambda: self._start_new_cue(new_cue, row))
+
+    def _start_new_cue(self, cue, row: int):
+        cue.execute(CueAction.Start)
+        self._current_cue = cue
+        self._current_row = row
+        self._table_model.refresh_row(row)
+        self._refresh_action_buttons()
+        if not self._progress_timer.isActive():
+            self._progress_timer.start()
 
     def _on_volume_changed(self, value):
         self._vol_label.setText(f"{value}%")

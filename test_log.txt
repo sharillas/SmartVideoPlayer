@@ -1,0 +1,37 @@
+2026-08-11 17:22:17,084 [INFO] ============================================================
+2026-08-11 17:22:17,084 [INFO] SmartPlayer End-to-End Test
+2026-08-11 17:22:17,085 [INFO] ============================================================
+2026-08-11 17:22:17,085 [INFO] Step 1: Importing modules...
+2026-08-11 17:22:17,307 [INFO]   All imports OK
+2026-08-11 17:22:17,307 [INFO] Step 2: Creating test cues...
+2026-08-11 17:22:17,308 [INFO]   Added: 1__16067_EventoASF_SALA_INTRO.mp4 (13.4MB)
+2026-08-11 17:22:17,308 [INFO]   Added: BG_Loop_H.264 MP4 - 3240x1080.mp4 (9.6MB)
+2026-08-11 17:22:17,308 [INFO]   Added: Smart Logo.mov (236.3MB)
+2026-08-11 17:22:17,309 [INFO]   Added: Soluções ecommerce CTT Loop2.mov (248.3MB)
+2026-08-11 17:22:17,309 [INFO]   Total cues: 4
+2026-08-11 17:22:17,309 [INFO] Step 3: Testing cue state machine...
+2026-08-11 17:22:17,309 [INFO]   Cue: 1__16067_EventoASF_SALA_INTRO.mp4
+2026-08-11 17:22:17,309 [INFO]     Initial state: 1
+2026-08-11 17:22:17,623 [INFO]     After start: 2
+2026-08-11 17:22:17,623 [INFO]     After pause: 2
+2026-08-11 17:22:17,624 [INFO]     After resume: 2
+2026-08-11 17:22:17,625 [INFO]     After stop: 2
+2026-08-11 17:22:17,625 [INFO]   Cue: BG_Loop_H.264 MP4 - 3240x1080.mp4
+2026-08-11 17:22:17,625 [INFO]     Initial state: 1
+2026-08-11 17:22:17,934 [INFO]     After start: 2
+2026-08-11 17:22:17,934 [INFO]     After pause: 2
+2026-08-11 17:22:17,934 [INFO]     After resume: 2
+2026-08-11 17:22:17,935 [INFO]     After stop: 2
+2026-08-11 17:22:17,935 [INFO]   Cue: Smart Logo.mov
+2026-08-11 17:22:17,936 [INFO]     Initial state: 1
+2026-08-11 17:22:18,247 [INFO]     After start: 2
+2026-08-11 17:22:18,248 [INFO]     After pause: 2
+2026-08-11 17:22:18,248 [INFO]     After resume: 2
+2026-08-11 17:22:18,249 [INFO]     After stop: 2
+2026-08-11 17:22:18,249 [INFO]   Cue: Soluções ecommerce CTT Loop2.mov
+2026-08-11 17:22:18,249 [INFO]     Initial state: 1
+2026-08-11 17:22:18,559 [INFO]     After start: 2
+2026-08-11 17:22:18,559 [INFO]     After pause: 2
+2026-08-11 17:22:18,559 [INFO]     After resume: 2
+2026-08-11 17:22:18,560 [INFO]     After stop: 2
+2026-08-11 17:22:18,561 [INFO] Step 4: Testing session save/load...

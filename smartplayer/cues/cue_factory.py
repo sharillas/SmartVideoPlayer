@@ -6,6 +6,7 @@ from .media_cue import MediaCue
 from .command_cue import CommandCue
 from .stop_all_cue import StopAllCue
 from .collection_cue import CollectionCue
+from .playlist_cue import PlaylistCue
 
 
 class CueFactory:
@@ -35,3 +36,4 @@ CueFactory.register("MediaCue", MediaCue)
 CueFactory.register("CommandCue", CommandCue)
 CueFactory.register("StopAllCue", StopAllCue)
 CueFactory.register("CollectionCue", CollectionCue)
+CueFactory.register("PlaylistCue", PlaylistCue)

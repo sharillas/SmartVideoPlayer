@@ -90,7 +90,6 @@ class MainWindow(QMainWindow):
         self._cue_view = CueListView(
             self._session.cue_model, self._video_manager, self._undo_stack
         )
-        self._cue_view._editor_panel.set_save_callback(self._on_save)
         layout.addWidget(self._cue_view)
 
         self._status_bar = QStatusBar()

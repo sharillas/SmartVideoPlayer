@@ -61,7 +61,7 @@ class Cue(HasProperties):
     fadeout_duration = Property(default=500)
     priority = Property(default=3)
     color = Property(default="")
-    output_target = Property(default=0)
+    output_target = Property(default=1)
 
     def __init__(self, cue_id: str | None = None, **kwargs):
         super().__init__(**kwargs)
@@ -144,10 +144,7 @@ class Cue(HasProperties):
 
     def _execute_stop(self):
         self._cancel_fade()
-        if self.fadeout_duration > 0:
-            self._start_fadeout_and_stop()
-        else:
-            self._do_stop()
+        self._do_stop()
 
     def _execute_pause(self):
         self._cancel_fade()

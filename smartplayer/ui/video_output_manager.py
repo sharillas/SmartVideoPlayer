@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtMultimediaWidgets import QVideoWidget
+from PySide6.QtWidgets import QWidget
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtCore import QUrl
@@ -89,10 +89,10 @@ class VideoOutputManager:
             self._windows[screen_index] = win
         return self._windows[screen_index]
 
-    def video_widget_for(self, screen_index: int) -> QVideoWidget:
+    def render_widget_for(self, screen_index: int) -> QWidget:
         win = self._get_window(screen_index)
         self._show_window(win, screen_index)
-        return win.video_widget
+        return win.render_widget
 
     def _show_window(self, win: VideoOutputWindow, screen_index: int):
         if self.has_external_display:

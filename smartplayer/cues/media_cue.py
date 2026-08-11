@@ -1,9 +1,21 @@
 from __future__ import annotations
 
+import os
+import json
+import subprocess
+import tempfile
+import time
+
 from .cue import Cue, CueState, CueAction, NextAction
 from .media import Media
 from ..core.properties import Property
-from ..core.fader import FadeType
+
+
+MPV_EXE = os.environ.get("MPV_PATH", "C:/Program Files/MPV Player/mpv.exe")
+
+
+def _vol(mpct: float) -> int:
+    return max(0, min(100, int(mpct * 100)))
 
 
 class MediaCue(Cue):
@@ -12,10 +24,10 @@ class MediaCue(Cue):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._media = Media()
-        self._player = None
-        self._audio_output = None
-        self._video_output = None
-        self._video_sink = None
+        self._proc = None
+        self._ipc = None
+        self._wid = None
+        self.currentPositionMs = 0
 
     @property
     def media(self) -> Media:
@@ -27,100 +39,98 @@ class MediaCue(Cue):
 
     @property
     def player(self):
-        return self._player
+        return self
 
-    def set_video_output(self, video_widget):
-        self._video_output = video_widget
-        if self._player is not None and video_widget is not None:
-            self._player.setVideoOutput(video_widget)
+    def set_video_output(self, widget):
+        self._wid = int(widget.winId()) if widget else None
+
+    def _ipc_send(self, *args):
+        if self._ipc is None:
+            return
+        try:
+            cmd = {"command": list(args)}
+            with open(self._ipc, 'w') as f:
+                f.write(json.dumps(cmd) + '\n')
+        except Exception:
+            pass
+
+    def _ipc_set(self, prop, value):
+        self._ipc_send("set_property", prop, value)
 
     def _setup_player(self):
-        from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
-        from PySide6.QtCore import QUrl
-        if self._player is None:
-            self._player = QMediaPlayer()
-            self._audio_output = QAudioOutput()
-            self._player.setAudioOutput(self._audio_output)
-            self._audio_output.setVolume(
-                self.media.volume / 100.0 if self.media.volume > 1 else self.media.volume
-            )
-            if self._video_output is not None:
-                self._player.setVideoOutput(self._video_output)
-            self._player.mediaStatusChanged.connect(self._on_media_status)
-            self._player.playbackStateChanged.connect(self._on_playback_state)
-            self._player.positionChanged.connect(self._on_position_changed)
-        if self.media.uri:
-            self._player.setSource(QUrl.fromLocalFile(self.media.uri))
+        if self._proc is not None or not self.media.uri or not os.path.exists(self.media.uri):
+            return
+        fd, self._ipc = tempfile.mkstemp(suffix='.ipc', prefix='svp_')
+        os.close(fd)
+        try:
+            os.unlink(self._ipc)
+        except OSError:
+            pass
+        cmd = [MPV_EXE, f'--input-ipc-server={self._ipc}', '--idle=yes',
+               '--no-terminal', '--no-input-default-bindings', '--osc=no', '--osd-level=0']
+        if self._wid:
+            cmd.append(f'--wid={self._wid}')
+        self._proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(0.3)
 
     def _do_start(self):
         self._setup_player()
-        if self._player is not None:
-            self._player.setPosition(0)
-            self._player.play()
-        # Reconnect position monitoring for PauseKeepLast
-        try:
-            self._player.positionChanged.disconnect(self._on_position_changed)
-        except Exception:
-            pass
-        if self.next_action == NextAction.PauseKeepLast:
-            self._player.positionChanged.connect(self._on_position_changed)
+        if self._proc is not None:
+            vol = _vol(self.media.volume / 100.0 if self.media.volume > 1 else self.media.volume)
+            self._ipc_send("loadfile", self.media.uri.replace('\\', '/'))
+            self._ipc_set("loop-file", "inf" if self.media.loop else "no")
+            if self.fadein_duration > 0:
+                from PySide6.QtCore import QTimer
+                steps, dur = 15, self.fadein_duration
+                self._ipc_set("volume", 0)
+                for i in range(1, steps + 1):
+                    v = int(vol * i / steps)
+                    QTimer.singleShot(i * (dur // steps), lambda v=v: self._ipc_set("volume", v))
+            else:
+                self._ipc_set("volume", vol)
 
     def _do_stop(self):
-        if self._player is not None:
-            self._player.stop()
+        if self._proc is not None:
+            if self.fadeout_duration > 0:
+                from PySide6.QtCore import QTimer
+                cur = _vol(self.media.volume / 100.0 if self.media.volume > 1 else self.media.volume)
+                steps, dur = 10, self.fadeout_duration
+                for i in range(steps):
+                    v = max(0, cur - int(cur * (i + 1) / steps))
+                    QTimer.singleShot(i * (dur // steps), lambda v=v: self._ipc_set("volume", v))
+                QTimer.singleShot(dur + 50, self._destroy_player)
+            else:
+                self._destroy_player()
+        else:
+            super()._do_stop()
+
+    def _destroy_player(self):
+        self._ipc_send("quit")
+        self._proc = None
+        try:
+            if self._ipc:
+                os.unlink(self._ipc)
+        except OSError:
+            pass
+        self._ipc = None
         super()._do_stop()
 
     def _do_pause(self):
-        if self._player is not None:
-            self._player.pause()
+        self._ipc_send("set_property", "pause", True)
         super()._do_pause()
 
     def _do_resume(self):
-        if self._player is not None:
-            self._player.play()
+        self._ipc_send("set_property", "pause", False)
         super()._do_resume()
 
-    def _on_media_status(self, status):
-        from PySide6.QtMultimedia import QMediaPlayer
-        if status == QMediaPlayer.MediaStatus.EndOfMedia:
-            loop_active = self.media.loop or self.next_action == NextAction.Loop
-            keep_last = self.next_action == NextAction.PauseKeepLast
-            if loop_active:
-                self._player.setPosition(0)
-                self._player.play()
-            elif keep_last:
-                # Already handled by position monitoring
-                pass
-            else:
-                self._do_stop()
-
-    def _on_position_changed(self, position):
-        if self.next_action != NextAction.PauseKeepLast:
-            return
-        dur = self._player.duration()
-        if dur > 0 and position >= dur - 150:
-            self._player.pause()
-            from PySide6.QtCore import QTimer
-            QTimer.singleShot(50, lambda: self._player.setPosition(dur - 100))
-            self.state = CueState.Pause
-            self.paused.emit()
-            self.end.emit()
-
-    def _on_playback_state(self, state):
-        pass
-
-    def set_volume(self, volume: float):
-        if self._audio_output is not None:
-            self._audio_output.setVolume(max(0.0, min(1.0, volume)))
+    def set_volume(self, vol: float):
+        self._ipc_send("set_property", "volume", _vol(vol))
 
     def to_dict(self) -> dict:
-        data = super().to_dict()
-        data["media"] = self.media.to_dict()
-        return data
+        return {**super().to_dict(), "media": self.media.to_dict()}
 
     @classmethod
     def from_dict(cls, data: dict) -> MediaCue:
-        media_data = data.pop("media", {})
         cue = super().from_dict(data)
-        cue.media = Media.from_dict(media_data)
+        cue.media = Media.from_dict(data.pop("media", {}))
         return cue

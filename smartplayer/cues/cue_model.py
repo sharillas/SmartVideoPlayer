@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from .cue import Cue, CueAction
+from .cue import Cue, CueAction, CueState
 from ..core.signal import Signal
 
 
@@ -82,7 +82,7 @@ class CueModel:
 
     def stop_all(self):
         for cue in self._cues.values():
-            if cue.state in Cue.CueState.IsRunning or cue.state in Cue.CueState.IsPaused:
+            if cue.state & (CueState.Running | CueState.Pause):
                 cue.execute(CueAction.Stop)
 
     def update_indices(self):

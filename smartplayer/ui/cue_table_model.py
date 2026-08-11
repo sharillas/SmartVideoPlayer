@@ -22,21 +22,69 @@ class ProgressDelegate(QStyledItemDelegate):
         col = index.column()
         is_running = bool(state & CueState.Running)
         is_active = bool(state & (CueState.Running | CueState.Pause | CueState.PreWait))
+        is_selected = bool(option.state & QStyle.StateFlag.State_Selected)
 
-        super().paint(painter, option, index)
+        # Suppress default selection background completely
+        opt = QStyleOptionViewItem(option)
+        opt.state &= ~QStyle.StateFlag.State_Selected
+        if is_selected:
+            opt.backgroundBrush = QColor(0, 0, 0, 0)
 
-        # Color tag: 1px border around the entire row
+        # Running: semi-transparent white
+        if is_running:
+            painter.fillRect(opt.rect, QColor(255, 255, 255, 20))
+
+        super().paint(painter, opt, index)
+
+        # Selected: blue outlined border around entire row (edges only)
+        if is_selected:
+            c = QColor("#2196F3")
+            pen = painter.pen()
+            pen.setColor(c)
+            pen.setWidth(2)
+            painter.setPen(pen)
+            r = opt.rect.adjusted(1, 1, -1, -1)
+            if col == self._model.COL_INDEX:
+                painter.drawLine(r.topLeft(), r.bottomLeft())
+                painter.drawLine(r.topLeft(), r.topRight())
+                painter.drawLine(r.bottomLeft(), r.bottomRight())
+            elif col == self._model.COL_ACTIONS:
+                painter.drawLine(r.topRight(), r.bottomRight())
+                painter.drawLine(r.topLeft(), r.topRight())
+                painter.drawLine(r.bottomLeft(), r.bottomRight())
+            else:
+                painter.drawLine(r.topLeft(), r.topRight())
+                painter.drawLine(r.bottomLeft(), r.bottomRight())
+
+        # Color tag: border around the entire row (edges only)
         if cue.color and cue.color != "":
             c = QColor(cue.color)
             pen = painter.pen()
             pen.setColor(c)
             pen.setWidth(1)
             painter.setPen(pen)
-            rect = option.rect.adjusted(0, 0, -1, -1)
-            painter.drawRect(rect)
+            r = opt.rect.adjusted(0, 0, 0, -1)
+            if col == self._model.COL_INDEX:
+                painter.drawLine(r.topLeft(), r.bottomLeft())
+                painter.drawLine(r.topLeft(), r.topRight())
+                painter.drawLine(r.bottomLeft(), r.bottomRight())
+            elif col == self._model.COL_ACTIONS:
+                painter.drawLine(r.topRight(), r.bottomRight())
+                painter.drawLine(r.topLeft(), r.topRight())
+                painter.drawLine(r.bottomLeft(), r.bottomRight())
+            else:
+                painter.drawLine(r.topLeft(), r.topRight())
+                painter.drawLine(r.bottomLeft(), r.bottomRight())
 
         if is_active and col == CueTableModel.COL_REMAINING and is_running and cue.duration > 0:
-            progress = min(self._model.current_position / max(cue.duration, 1), 1.0)
+            # Get position from the cue's own player
+            pos = 0
+            if cue._type_ == "MediaCue":
+                try:
+                    pos = getattr(cue, 'currentPositionMs', 0)
+                except Exception:
+                    pass
+            progress = min(pos / max(cue.duration, 1), 1.0)
             if progress > 0:
                 fill_width = max(0, int(option.rect.width() * progress))
                 fill_rect = option.rect
@@ -56,12 +104,16 @@ class CueTableModel(QAbstractTableModel):
     COL_NAME = 1
     COL_REMAINING = 2
     COL_DURATION = 3
-    COL_NEXT = 4
-    COL_OUTPUT = 5
-    COL_ACTIONS = 6
-    COL_COUNT = 7
+    COL_SIZE = 4
+    COL_RESOLUTION = 5
+    COL_CODEC = 6
+    COL_EXTENSION = 7
+    COL_NEXT = 8
+    COL_OUTPUT = 9
+    COL_ACTIONS = 10
+    COL_COUNT = 11
 
-    HEADERS = ["Cue", "Name", "Remaining", "Duration", "Next", "Out", "Actions"]
+    HEADERS = ["Cue", "Name", "Remaining", "Duration", "Size", "Resolution", "Codec", "Ext", "Next", "Output", "Actions"]
 
     CueRole = Qt.ItemDataRole.UserRole + 1
     StateRole = Qt.ItemDataRole.UserRole + 2
@@ -110,6 +162,14 @@ class CueTableModel(QAbstractTableModel):
                 return self._remaining_time(cue)
             elif col == self.COL_DURATION:
                 return self._format_time(cue.duration)
+            elif col == self.COL_SIZE:
+                return self._format_size(cue)
+            elif col == self.COL_RESOLUTION:
+                return self._format_resolution(cue)
+            elif col == self.COL_CODEC:
+                return self._format_codec(cue)
+            elif col == self.COL_EXTENSION:
+                return self._format_extension(cue)
             elif col == self.COL_NEXT:
                 return self._next_label(cue)
             elif col == self.COL_OUTPUT:
@@ -118,19 +178,18 @@ class CueTableModel(QAbstractTableModel):
                 return ""
 
         if role == Qt.ItemDataRole.ForegroundRole:
-            return QColor("#ffffff") if cue.state & CueState.Running else QColor("#cccccc")
+            if cue.state & (CueState.Running | CueState.Pause):
+                return QColor("#ffffff")
+            return QColor("#cccccc")
 
         if role == Qt.ItemDataRole.FontRole:
-            state = cue.state
-            if state & (CueState.Running | CueState.Pause | CueState.PreWait):
-                font = QFont()
-                font.setBold(True)
-                return font
             return None
 
         if role == Qt.ItemDataRole.TextAlignmentRole:
-            if col in (self.COL_INDEX, self.COL_REMAINING, self.COL_DURATION, self.COL_NEXT):
+            if col in (self.COL_INDEX, self.COL_REMAINING, self.COL_DURATION, self.COL_NEXT, self.COL_OUTPUT):
                 return Qt.AlignmentFlag.AlignCenter
+            if col == self.COL_ACTIONS:
+                return Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
             return Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 
         if role == Qt.ItemDataRole.ToolTipRole and col == self.COL_NAME:
@@ -144,11 +203,13 @@ class CueTableModel(QAbstractTableModel):
         return None
 
     def _remaining_time(self, cue: Cue) -> str:
+        from ..cues.media_cue import MediaCue
+        pos = 0
+        if isinstance(cue, MediaCue):
+            pos = getattr(cue, 'currentPositionMs', 0) or 0
         if cue.state & CueState.Running and cue.duration > 0:
-            remaining = max(0, cue.duration - self.current_position)
+            remaining = max(0, cue.duration - pos)
             return "-" + self._format_time(remaining)
-        if cue.state & CueState.Pause and self.current_position >= cue.duration > 0:
-            return "00:00:00"
         if cue.duration > 0:
             return self._format_time(cue.duration)
         return "00:00:00"
@@ -160,6 +221,35 @@ class CueTableModel(QAbstractTableModel):
         mins, secs = divmod(total_sec, 60)
         hours, mins = divmod(mins, 60)
         return f"{hours:02d}:{mins:02d}:{secs:02d}"
+
+    def _format_size(self, cue: Cue) -> str:
+        from ..cues.media_cue import MediaCue
+        if isinstance(cue, MediaCue) and cue.media.file_size > 0:
+            size_mb = cue.media.file_size / (1024 * 1024)
+            if size_mb >= 1000:
+                return f"{size_mb/1024:.1f} GB"
+            return f"{size_mb:.1f} MB"
+        return "-"
+
+    def _format_resolution(self, cue: Cue) -> str:
+        from ..cues.media_cue import MediaCue
+        if isinstance(cue, MediaCue) and cue.media.resolution:
+            return cue.media.resolution
+        return "-"
+
+    def _format_codec(self, cue: Cue) -> str:
+        from ..cues.media_cue import MediaCue
+        if isinstance(cue, MediaCue) and cue.media.codec:
+            return cue.media.codec
+        return "-"
+
+    def _format_extension(self, cue: Cue) -> str:
+        from ..cues.media_cue import MediaCue
+        import os
+        if isinstance(cue, MediaCue) and cue.media.uri:
+            ext = os.path.splitext(cue.media.uri)[1].lower()
+            return ext if ext else "-"
+        return "-"
 
     def _next_label(self, cue: Cue) -> str:
         na = cue.next_action
@@ -173,12 +263,14 @@ class CueTableModel(QAbstractTableModel):
         return labels.get(na, "")
 
     def _on_data_changed(self, *args):
+        self.beginResetModel()
         self.endResetModel()
 
     def cue_at_row(self, row: int) -> Cue | None:
         return self._cue_model.cue_at(row)
 
     def refresh(self):
+        self.beginResetModel()
         self.endResetModel()
 
     def refresh_row(self, row: int):
