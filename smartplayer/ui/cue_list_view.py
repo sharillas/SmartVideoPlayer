@@ -653,26 +653,36 @@ class CueListView(QWidget):
         self._launch_with_transition(row)
 
     def _launch_with_transition(self, row: int):
-        cue = self._cue_model.cue_at(row)
-        if cue is None:
-            return
-        # Route video first
-        if isinstance(cue, MediaCue) and self._is_video_file(cue.media.uri):
-            if self._display_enabled:
-                widget = self._video_manager.video_widget_for(cue.output_target)
-                cue.set_video_output(widget)
+        try:
+            cue = self._cue_model.cue_at(row)
+            if cue is None:
+                return
+            # Route video first
+            if isinstance(cue, MediaCue) and self._is_video_file(cue.media.uri):
+                if self._display_enabled:
+                    try:
+                        widget = self._video_manager.video_widget_for(cue.output_target)
+                        cue.set_video_output(widget)
+                    except Exception:
+                        pass
 
-        # Stop old cues on same output immediately (no fade)
-        for other in self._cue_model.cues():
-            if other is not cue and other.output_target == cue.output_target:
-                if other.state & (CueState.Running | CueState.Pause):
-                    if hasattr(other, 'stop_immediate'):
-                        other.stop_immediate()
-                    else:
-                        other.execute(CueAction.Stop)
+            # Stop old cues on same output immediately
+            for other in self._cue_model.cues():
+                if other is not cue and other.output_target == cue.output_target:
+                    if other.state & (CueState.Running | CueState.Pause):
+                        try:
+                            if hasattr(other, 'stop_immediate'):
+                                other.stop_immediate()
+                            else:
+                                other.execute(CueAction.Stop)
+                        except Exception:
+                            pass
 
-        # Start new cue immediately
-        self._start_cue_delayed(row)
+            # Start new cue
+            self._start_cue_delayed(row)
+        except Exception:
+            import traceback
+            traceback.print_exc()
 
     def _start_cue_delayed(self, row: int):
         cue = self._cue_model.cue_at(row)
